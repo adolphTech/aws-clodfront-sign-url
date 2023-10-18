@@ -186,18 +186,25 @@ app.get("/api/posts", async (req, res) => {
   try {
     const posts = await Post.find({});
     
-    
-    for await (const post of posts) {
-      post.imageUrl = getSignedUrl({
-        url: "https://d219llnsf16hmq.cloudfront.net/" + post.imageName,
+    const signedUrlPromises = posts.map(async (post) => {
+      const imageUrl = "https://d219llnsf16hmq.cloudfront.net/" + post.imageName;
+      return getSignedUrl({
+        url: imageUrl,
         dateLessThan: new Date(Date.now() + 1000 * 60 * 60 * 24),
         privateKey: process.env.CLOUDFRONT_PRIVATE_KEY,
         keyPairId: process.env.CLOUDFRONT_KEY_PAIR_ID,
       });
-      // const mln = post.imageUrl
-    }
+    });
 
-    res.send(posts);
+    const signedUrls = await Promise.all(signedUrlPromises);
+
+    // Create a new array with imageUrl property added
+    const postsWithImageUrl = posts.map((post, index) => ({
+      ...post.toObject(), // Convert Mongoose document to plain JavaScript object
+      imageUrl: signedUrls[index],
+    }));
+
+    res.send(postsWithImageUrl);
   } catch (error) {
     console.error('Error fetching and signing posts:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -205,42 +212,30 @@ app.get("/api/posts", async (req, res) => {
 });
 
 
+
+
 // app.get("/api/posts", async (req, res) => {
 //   try {
 //     const posts = await Post.find({});
-//     let newRes= []
-
-//     for (const post of posts){
+    
+    
+//     for await (const post of posts) {
 //       post.imageUrl = getSignedUrl({
 //         url: "https://d219llnsf16hmq.cloudfront.net/" + post.imageName,
 //         dateLessThan: new Date(Date.now() + 1000 * 60 * 60 * 24),
 //         privateKey: process.env.CLOUDFRONT_PRIVATE_KEY,
 //         keyPairId: process.env.CLOUDFRONT_KEY_PAIR_ID,
+//       });
+//       // const mln = post.imageUrl
+//     }
 
-//       })
-      
-//       const newPostData = {
-//         ...post.toObject(),
-//         imageUrl: post.imageUrl,
-//       };
-
-//       newRes.push(newPostData);
-//     }  
-
-//     res.json(newRes);
+//     res.send(posts);
 //   } catch (error) {
 //     console.error('Error fetching and signing posts:', error);
 //     res.status(500).json({ error: 'Internal Server Error' });
 //   }
 // });
-
-
-
-
-
-
-
-  
+ 
 
 
 app.delete("/api/posts/:id", async (req, res) => {
